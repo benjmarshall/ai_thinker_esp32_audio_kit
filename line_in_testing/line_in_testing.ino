@@ -43,6 +43,8 @@
 #define PIN_VOL_UP                  (18)      // KEY 5
 #define PIN_VOL_DOWN                (5)       // KEY 6
 #define PIN_INPUT_SELECT            (23)      // KEY 4
+#define PIN_GAIN_UP					(13)      // KEY 2
+#define PIN_GAIN_DOWN				(19)      // KEY 3
 
 static AC101 i2sCodec;
 YummyDSP dsp;
@@ -53,6 +55,9 @@ const int channelCount = 2;
 
 static uint8_t volume = 12;
 const uint8_t volume_step = 2;
+static uint8_t gain = 160;
+const uint8_t gain_step = 2;
+
 int input_select = 1;
 
 int debounce = 0;
@@ -81,10 +86,13 @@ void setup()
   pinMode(PIN_INPUT_SELECT, INPUT_PULLUP);
   pinMode(PIN_VOL_UP, INPUT_PULLUP);
   pinMode(PIN_VOL_DOWN, INPUT_PULLUP);
+  pinMode(PIN_GAIN_DOWN, INPUT_PULLUP);
+  pinMode(PIN_GAIN_UP, INPUT_PULLUP);
 
   Serial.printf("Use KEY5/KEY6 for volume Up/Down\n");
   Serial.printf("Use KEY4 for Input Select\n");
   Serial.printf("Line In selected by default\n");
+  Serial.printf("Use KEY2/KEY3 for ADC Gain Up/Down\n");
 
   // setup audio lib
   dsp.begin(fs);
@@ -100,7 +108,7 @@ void setup()
   // run stats loop
   xTaskCreate(stats_loop, "statsloop", 10000, NULL, 10, NULL);
   // run control task on another cpu  core with lower priority
-  Serial.print("\nSetup done ");
+  Serial.print("\nSetup done\n");
 
 }
 
@@ -120,7 +128,7 @@ bool pressed( const int pin )
 
 void audioTask(void *) {
 
-  Serial.print("\nAudio task");
+  Serial.print("Audio task\n");
 
   float sample = 0;
 
@@ -149,6 +157,7 @@ void audioTask(void *) {
 void loop()
 {
   bool updateVolume = false;
+  bool updateGain = false;
 
   delay(2);
 
@@ -178,6 +187,7 @@ void loop()
     i2sCodec.SetVolumeHeadphone(volume);
   }
   if (pressed(PIN_INPUT_SELECT))
+  {
 	if (input_select == 0)
 	{
 		Serial.printf("Line In Selected\n");
@@ -194,15 +204,41 @@ void loop()
 		delay(100);
 		stats.reset();
 	}
-		
+  }
+  if (pressed(PIN_GAIN_UP))
+  {
+	if (gain <= (255 - gain_step))
+    {
+      // Increase gain
+      gain += gain_step;
+      updateGain = true;
+    }
+  }
+  if (pressed(PIN_GAIN_DOWN))
+  {
+	if (gain >= gain_step)
+    {
+      // Increase gain
+      gain -= gain_step;
+      updateGain = true;
+    }
+  }
+  if (updateGain)
+  {
+    // Gain change requested
+    Serial.printf("ADC Gain %d\n", gain);
+    i2sCodec.SetADCGain(gain);
+  }
 	
 }
 
 void stats_loop(void *) {
 	
-	Serial.printf("Stats Task");
+	Serial.printf("Stats Task\n");
 	
 	while (true) {
+		
+		stats.reset();
 		
 		delay(2000);
 	
